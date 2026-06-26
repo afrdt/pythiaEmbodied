@@ -7,6 +7,7 @@ import subprocess
 import requests
 import soundfile as sf
 import re
+from datetime import datetime
 
 # ── RAG imports ───────────────────────────────────────────────────────────────
 import chromadb
@@ -20,6 +21,7 @@ OLLAMA_MODEL   = "oracle"
 SAMPLE_RATE    = 16000
 
 PIPER_MODEL    = "/home/pythia/piper_voices/en_US-amy-medium.onnx"
+REPLIES_DIR    = "/home/pythia/rag_project/replies"
 
 # RAG settings
 DATASET_PATH   = "/home/pythia/rag_project/pythiaDatasetClean.txt"
@@ -193,7 +195,15 @@ def speak(text):
             return
 
         if os.path.exists("response.wav"):
+            # Save a copy to replies folder with timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            save_path = os.path.join(REPLIES_DIR, f"reply_{timestamp}.wav")
+            os.makedirs(REPLIES_DIR, exist_ok=True)
+
             data, samplerate = sf.read("response.wav")
+            sf.write(save_path, data, samplerate)
+            print(f"Saved: {save_path}")
+
             sd.play(data, samplerate)
             sd.wait()
             os.remove("response.wav")
