@@ -2,7 +2,10 @@
 chroma_db/
 
 # Audio temp files
-*.wav
+response.wav
+input.wav
+test_amy.wav
+test_mv2.wav
 *.mp3
 
 # Python
