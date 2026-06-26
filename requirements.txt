@@ -1,0 +1,7 @@
+sounddevice
+scipy
+soundfile
+numpy
+requests
+chromadb
+piper-tts

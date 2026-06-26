@@ -1,0 +1,19 @@
+# Vector store — rebuilt on first run
+chroma_db/
+
+# Audio temp files
+*.wav
+*.mp3
+
+# Python
+__pycache__/
+*.pyc
+voice_env/
+
+# Dataset — may contain copyrighted material
+docs/pythiaDataset.txt
+docs/pythiaDatasetClean.txt
+
+# Piper voice models — downloaded separately
+sounds/*.onnx
+sounds/*.onnx.json
