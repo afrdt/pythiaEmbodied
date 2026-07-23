@@ -195,6 +195,15 @@ def speak(text):
             return
 
         if os.path.exists("response.wav"):
+            # Boost volume
+            subprocess.run([
+                "ffmpeg", "-y", "-i", "response.wav",
+                "-af", "asetrate=22050*0.75,aresample=22050,volume=5.0",
+                "response_boosted.wav"
+            ], capture_output=True)
+            if os.path.exists("response_boosted.wav"):
+                os.replace("response_boosted.wav", "response.wav")
+
             # Save a copy to replies folder with timestamp
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             save_path = os.path.join(REPLIES_DIR, f"reply_{timestamp}.wav")
