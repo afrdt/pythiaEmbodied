@@ -20,10 +20,15 @@ AUDIO_FILE     = "/home/pythia/input.wav"
 OLLAMA_MODEL   = "oracle"
 SAMPLE_RATE    = 16000
 
-# Voice
-VOICE_MODEL    = "/home/pythia/piper_voices/en_US-amy-medium.onnx"
-PITCH_UP       = 1.122   # 2 semitones up
-PITCH_DOWN     = 0.891   # 2 semitones down
+# Three voices with different timbres — subtle pitch shifts only
+VOICE_AMY      = "/home/pythia/piper_voices/en_US-amy-medium.onnx"
+VOICE_JENNY    = "/home/pythia/piper_voices/en_GB-jenny-medium.onnx"
+VOICE_LESSAC   = "/home/pythia/piper_voices/en_US-lessac-medium.onnx"
+
+# Subtle pitch shifts — just enough to customize, not cartoonify
+PITCH_AMY      = 0.944   # 1 semitone down
+PITCH_JENNY    = 1.0     # no shift — keep her natural
+PITCH_LESSAC   = 0.971   # half semitone down
 
 REPLIES_DIR    = "/home/pythia/rag_project/replies"
 
@@ -174,14 +179,13 @@ def query_ollama(prompt, context_chunks):
     print("Oracle:", output)
     return output
 
-# ── Piper TTS — pitch-shifted chorus ─────────────────────────────────────────
+# ── Piper TTS — three voice chorus ───────────────────────────────────────────
 def clean_text(text):
     text = re.sub(r"[^\x00-\x7F]+", "", text)
     text = re.sub(r"\s+", " ", text).strip()
     return text
 
 def generate_voice(text, model, output_file):
-    """Generate a single voice WAV with piper."""
     result = subprocess.run(
         ["piper", "--model", model, "--output_file", output_file],
         input=text,
@@ -189,43 +193,33 @@ def generate_voice(text, model, output_file):
         text=True
     )
     if result.returncode != 0:
-        print(f"Piper error: {result.stderr}")
+        print(f"Piper error ({model}): {result.stderr}")
         return False
     return os.path.exists(output_file)
 
-def mix_voices(base, output):
-    """Pitch shift base voice up and down, then mix all three."""
-    high = "/tmp/voice_high.wav"
-    low  = "/tmp/voice_low.wav"
-
-    # Pitch up 2 semitones
+def pitch_shift(input_file, output_file, pitch):
+    """Apply subtle pitch shift via asetrate."""
+    if pitch == 1.0:
+        subprocess.run(["cp", input_file, output_file])
+        return os.path.exists(output_file)
     subprocess.run([
-        "ffmpeg", "-y", "-i", base,
-        "-af", f"asetrate=22050*{PITCH_UP},aresample=22050",
-        high
+        "ffmpeg", "-y", "-i", input_file,
+        "-af", f"asetrate=22050*{pitch},aresample=22050",
+        output_file
     ], capture_output=True)
+    return os.path.exists(output_file)
 
-    # Pitch down 2 semitones
-    subprocess.run([
-        "ffmpeg", "-y", "-i", base,
-        "-af", f"asetrate=22050*{PITCH_DOWN},aresample=22050",
-        low
-    ], capture_output=True)
-
-    # Mix — Amy leads, shifted voices are ghostly underneath
+def mix_voices(amy, jenny, lessac, output):
+    """Mix three voices with glue reverb and volume boost."""
     result = subprocess.run([
         "ffmpeg", "-y",
-        "-i", base, "-i", high, "-i", low,
+        "-i", amy, "-i", jenny, "-i", lessac,
         "-filter_complex",
-        "amix=inputs=3:duration=longest:normalize=0:weights=1 0.3 0.3",
+        "amix=inputs=3:duration=longest:normalize=0:weights=1 0.8 0.7,"
+        "aecho=0.8:0.7:40:0.2,"
+        "volume=3.0",
         output
     ], capture_output=True, text=True)
-
-    # Cleanup pitch files
-    for f in [high, low]:
-        if os.path.exists(f):
-            os.remove(f)
-
     return os.path.exists(output)
 
 def speak(text):
@@ -235,34 +229,52 @@ def speak(text):
         return
 
     print("Speaking...")
-    base   = "/tmp/voice_base.wav"
-    mixed  = "/tmp/voice_mixed.wav"
+    tmp = {
+        "amy_raw":    "/tmp/amy_raw.wav",
+        "jenny_raw":  "/tmp/jenny_raw.wav",
+        "lessac_raw": "/tmp/lessac_raw.wav",
+        "amy":        "/tmp/amy.wav",
+        "jenny":      "/tmp/jenny.wav",
+        "lessac":     "/tmp/lessac.wav",
+        "mixed":      "/tmp/mixed.wav",
+    }
 
     try:
-        if not generate_voice(cleaned, VOICE_MODEL, base):
-            print("Voice generation failed.")
+        # Generate all three voices
+        ok1 = generate_voice(cleaned, VOICE_AMY,    tmp["amy_raw"])
+        ok2 = generate_voice(cleaned, VOICE_JENNY,  tmp["jenny_raw"])
+        ok3 = generate_voice(cleaned, VOICE_LESSAC, tmp["lessac_raw"])
+
+        if not (ok1 and ok2 and ok3):
+            print("One or more voices failed.")
             return
 
-        if not mix_voices(base, mixed):
+        # Apply subtle pitch shifts
+        pitch_shift(tmp["amy_raw"],    tmp["amy"],    PITCH_AMY)
+        pitch_shift(tmp["jenny_raw"],  tmp["jenny"],  PITCH_JENNY)
+        pitch_shift(tmp["lessac_raw"], tmp["lessac"], PITCH_LESSAC)
+
+        # Mix with reverb glue and volume boost
+        if not mix_voices(tmp["amy"], tmp["jenny"], tmp["lessac"], tmp["mixed"]):
             print("Voice mixing failed.")
             return
 
         # Save to replies folder
         os.makedirs(REPLIES_DIR, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        save_path = os.path.join(REPLIES_DIR, f"reply_{timestamp}.wav")
-        subprocess.run(["cp", mixed, save_path])
+        save_path = os.path.join(REPLIES_DIR, f"reply_poly_{timestamp}.wav")
+        subprocess.run(["cp", tmp["mixed"], save_path])
         print(f"Saved: {save_path}")
 
         # Play
-        data, samplerate = sf.read(mixed)
+        data, samplerate = sf.read(tmp["mixed"])
         sd.play(data, samplerate)
         sd.wait()
 
     except Exception as e:
         print(f"TTS error: {e}")
     finally:
-        for f in [base, mixed]:
+        for f in tmp.values():
             if os.path.exists(f):
                 os.remove(f)
 
