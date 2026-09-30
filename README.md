@@ -29,7 +29,7 @@ Add your dataset as `docs/pythiaDataset.txt` then run:
 
 ```bash
 source /home/pythia/voice_env/bin/activate
-python scripts/pythiaRAG.py
+python /pythiaEmbodied/scripts/pythiaRAG.py
 ```
 
 ## First Run
