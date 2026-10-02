@@ -140,7 +140,7 @@ def query_ollama(prompt, context_chunks):
         f"If they are not relevant, speak from your own ancient wisdom. "
         f"Do not quote them directly — let their wisdom flow through your words.\n\n"
         f"[SACRED TEXTS]\n{context_block}\n[/SACRED TEXTS]\n\n"
-        f"Seeker's question: {prompt}"
+        f"Remember: you are Pythia. Respond as Pythia only.\nSeeker's question: {prompt}"
     )
 
     try:
@@ -172,6 +172,10 @@ def query_ollama(prompt, context_chunks):
 
 # ── Piper TTS ─────────────────────────────────────────────────────────────────
 def clean_text(text):
+    text = re.sub(r"\*+", "", text)          # strip asterisks
+    text = re.sub(r"#+\s*", "", text)         # strip markdown headers
+    text = re.sub(r"_{2,}", "", text)         # strip underscores
+    text = re.sub(r"\[([^\]]+)\]\([^\)]+\)", r"\1", text)  # strip links
     text = re.sub(r"[^\x00-\x7F]+", "", text)
     text = re.sub(r"\s+", " ", text).strip()
     return text
@@ -198,7 +202,7 @@ def speak(text):
             # Boost volume
             subprocess.run([
                 "ffmpeg", "-y", "-i", "response.wav",
-                "-af", "asetrate=22050*0.75,aresample=22050,volume=5.0",
+                "-af", "asetrate=22050*0.75,aresample=22050,volume=15.0",
                 "response_boosted.wav"
             ], capture_output=True)
             if os.path.exists("response_boosted.wav"):
