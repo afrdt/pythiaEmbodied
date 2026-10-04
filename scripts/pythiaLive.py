@@ -37,6 +37,13 @@ CHUNK_DURATION     = 0.3
 # Ollama
 MAX_TOKENS = 120
 
+# Identity questions — skip RAG for these, it only confuses the model
+IDENTITY_KEYWORDS = [
+    "your name", "who are you", "what are you", "your identity",
+    "your story", "your origins", "where are you from", "what is your name",
+    "call yourself", "you called"
+]
+
 # ── RAG: chunking & indexing ──────────────────────────────────────────────────
 def chunk_text(text, size=CHUNK_SIZE, overlap=CHUNK_OVERLAP):
     chunks = []
@@ -83,6 +90,10 @@ def build_vector_store(dataset_path, chroma_dir):
 def retrieve_context(query, collection, embedder, top_k=TOP_K):
     results = collection.query(query_texts=[query], n_results=top_k)
     return results["documents"][0]
+
+def is_identity_question(prompt):
+    p = prompt.lower()
+    return any(kw in p for kw in IDENTITY_KEYWORDS)
 
 # ── Recording with silence detection ─────────────────────────────────────────
 def record_audio(filename):
@@ -131,16 +142,25 @@ def transcribe_whisper(audio_file):
 # ── Ollama query with RAG context ─────────────────────────────────────────────
 def query_ollama(prompt, context_chunks):
     print("Thinking...")
-    context_block = "\n\n".join(context_chunks)
 
-    full_prompt = (
-        f"Remember: you are Pythia. Respond as Pythia only.\n"
-        f"Draw upon these sacred texts to inform your prophecy. "
-        f"If they are not relevant, speak from your own ancient wisdom. "
-        f"Do not quote them directly — let their wisdom flow through your words.\n\n"
-        f"[SACRED TEXTS]\n{context_block}\n[/SACRED TEXTS]\n\n"
-        f"Seeker's question: {prompt}"
-    )
+    identity = is_identity_question(prompt)
+
+    if identity:
+        print("Identity question — skipping RAG.")
+        full_prompt = (
+            f"You are Pythia. Only Pythia. Not Echo. Not Lyra. Not an AI.\n"
+            f"Seeker's question: {prompt}"
+        )
+    else:
+        context_block = "\n\n".join(context_chunks)
+        full_prompt = (
+            f"You are Pythia. Only Pythia. Not Echo. Not Lyra. Not an AI.\n"
+            f"Draw upon these sacred texts to inform your prophecy. "
+            f"If they are not relevant, speak from your own ancient wisdom. "
+            f"Do not quote them directly — let their wisdom flow through your words.\n\n"
+            f"[SACRED TEXTS]\n{context_block}\n[/SACRED TEXTS]\n\n"
+            f"Seeker's question: {prompt}"
+        )
 
     try:
         response = requests.post(
