@@ -37,17 +37,17 @@ python /pythiaEmbodied/scripts/pythiaRAG.py
 The first run will index your dataset into ChromaDB. This takes 1-2 hours on a Pi 5. Subsequent runs load instantly.
 
 ## Every Run
-To start a persistent session
+To start a persistent session:
 
 ```bash
 ssh pythia@xx.xx.x.xxx
 screen -S pythia
 source /home/pythia/voice_env/bin/activate
-cd pythiaEmbodied/scripts
-python pythiaFinal.py
+cd /home/pythia/pythiaEmbodied/scripts
+python pythiaLive.py
 ```
-To detach without stopping it press Ctrl+A then D. The script keeps running on the Pi.
-Reattach later from any SSH session
+
+To detach without stopping it press `Ctrl+A` then `D`. The script keeps running on the Pi. Reattach later from any SSH session:
 
 ```bash
 ssh pythia@xx.xx.x.xxx
