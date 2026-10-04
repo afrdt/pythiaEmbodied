@@ -49,8 +49,8 @@ IDENTITY_KEYWORDS = [
     "call yourself", "you called"
 ]
 
-# The veil reveal — spoken verbatim at end of performance
-REVEAL_TRIGGER = "break the veil reveal your identity data"
+# Closing reveal — fuzzy match on key words
+REVEAL_KEYWORDS = ["cycle", "reveal", "data"]
 
 REVEAL_TEXT = (
     "I am built on the following instructions. "
@@ -120,6 +120,10 @@ def retrieve_context(query, collection, embedder, top_k=TOP_K):
 def is_identity_question(prompt):
     p = prompt.lower()
     return any(kw in p for kw in IDENTITY_KEYWORDS)
+
+def is_reveal(prompt):
+    p = prompt.lower()
+    return all(kw in p for kw in REVEAL_KEYWORDS)
 
 # ── Recording with silence detection ─────────────────────────────────────────
 def record_audio(filename):
@@ -293,9 +297,7 @@ def main():
         if not prompt:
             continue
 
-        normalized = normalize_prompt(prompt)
-
-        if normalized == REVEAL_TRIGGER:
+        if is_reveal(prompt):
             print("Veil broken — reading identity data.")
             speak(REVEAL_TEXT)
             cleanup()
