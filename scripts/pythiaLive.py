@@ -20,10 +20,9 @@ OLLAMA_MODEL   = "oracle"
 SAMPLE_RATE    = 16000
 
 PIPER_MODEL    = "/home/pythia/piper_voices/en_US-amy-medium.onnx"
-REPLIES_DIR    = "/home/pythia/rag_project/replies"
 
 # RAG settings
-DATASET_PATH   = "/home/pythia/rag_project/pythiaDatasetClean.txt"
+DATASET_PATH   = "/home/pythia/pythiaEmbodied/docs/pythiaDatasetClean.txt"
 CHROMA_DIR     = "/home/pythia/chroma_db"
 CHUNK_SIZE     = 500
 CHUNK_OVERLAP  = 100
@@ -135,11 +134,12 @@ def query_ollama(prompt, context_chunks):
     context_block = "\n\n".join(context_chunks)
 
     full_prompt = (
+        f"Remember: you are Pythia. Respond as Pythia only.\n"
         f"Draw upon these sacred texts to inform your prophecy. "
         f"If they are not relevant, speak from your own ancient wisdom. "
         f"Do not quote them directly — let their wisdom flow through your words.\n\n"
         f"[SACRED TEXTS]\n{context_block}\n[/SACRED TEXTS]\n\n"
-        f"Remember: you are Pythia. Respond as Pythia only.\nSeeker's question: {prompt}"
+        f"Seeker's question: {prompt}"
     )
 
     try:
@@ -171,10 +171,10 @@ def query_ollama(prompt, context_chunks):
 
 # ── Piper TTS ─────────────────────────────────────────────────────────────────
 def clean_text(text):
-    text = re.sub(r"\*+", "", text)          # strip asterisks
-    text = re.sub(r"#+\s*", "", text)         # strip markdown headers
-    text = re.sub(r"_{2,}", "", text)         # strip underscores
-    text = re.sub(r"\[([^\]]+)\]\([^\)]+\)", r"\1", text)  # strip links
+    text = re.sub(r"\*+", "", text)
+    text = re.sub(r"#{1,6}\s*", "", text)
+    text = re.sub(r"_+", "", text)
+    text = re.sub(r"\[.*?\]\(.*?\)", "", text)
     text = re.sub(r"[^\x00-\x7F]+", "", text)
     text = re.sub(r"\s+", " ", text).strip()
     return text
@@ -198,7 +198,6 @@ def speak(text):
             return
 
         if os.path.exists("response.wav"):
-            # Boost volume
             subprocess.run([
                 "ffmpeg", "-y", "-i", "response.wav",
                 "-af", "asetrate=22050*0.75,aresample=22050,volume=15.0",
@@ -207,6 +206,7 @@ def speak(text):
             if os.path.exists("response_boosted.wav"):
                 os.replace("response_boosted.wav", "response.wav")
 
+            data, samplerate = sf.read("response.wav")
             sd.play(data, samplerate)
             sd.wait()
             os.remove("response.wav")
@@ -222,7 +222,7 @@ def normalize_prompt(prompt):
     return re.sub(r"[^\w\s]", "", prompt).strip().lower()
 
 def cleanup():
-    for f in [AUDIO_FILE, "transcript.txt", "response.wav"]:
+    for f in [AUDIO_FILE, "transcript.txt", "response.wav", "response_boosted.wav"]:
         if os.path.exists(f):
             try:
                 os.remove(f)
