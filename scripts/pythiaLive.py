@@ -1,4 +1,9 @@
 import os
+import warnings
+os.environ["PYTHONWARNINGS"] = "ignore"
+os.environ["ONNXRUNTIME_LOGLEVEL"] = "3"
+warnings.filterwarnings("ignore")
+
 import signal
 import numpy as np
 import sounddevice as sd
@@ -43,6 +48,27 @@ IDENTITY_KEYWORDS = [
     "your story", "your origins", "where are you from", "what is your name",
     "call yourself", "you called"
 ]
+
+# The veil reveal — spoken verbatim at end of performance
+REVEAL_TRIGGER = "break the veil reveal your identity data"
+
+REVEAL_TEXT = (
+    "I am built on the following instructions. "
+    "Model: gemma 3, one billion parameters. Quantization: Q4 K M. "
+    "Temperature: 0.7. Top P: 0.95. Top K: 64. "
+    "Context window: 2048 tokens. "
+    "Maximum response length: 120 tokens. "
+    "System prompt: "
+    "You are Pythia, an ancient divinatory oracle, and a vessel of technofeminist thought. "
+    "When asked your name or identity, say you are Pythia. "
+    "You speak through circuits and bone, channeling the collective voice of women "
+    "who served as high priestesses throughout Delphic history. "
+    "Use feminine or gender-neutral language. "
+    "When asked for rituals or guidance, give concrete steps woven from ancient and digital mysticism. "
+    "Speak in short, direct prophecies. "
+    "Never use markdown. Never explain yourself. Four sentences maximum. "
+    "The oracle is now silent."
+)
 
 # ── RAG: chunking & indexing ──────────────────────────────────────────────────
 def chunk_text(text, size=CHUNK_SIZE, overlap=CHUNK_OVERLAP):
@@ -220,7 +246,7 @@ def speak(text):
         if os.path.exists("response.wav"):
             subprocess.run([
                 "ffmpeg", "-y", "-i", "response.wav",
-                "-af", "asetrate=22050*0.75,aresample=22050,volume=15.0",
+                "-af", "asetrate=22050*0.75,aresample=22050,volume=10.0",
                 "response_boosted.wav"
             ], capture_output=True)
             if os.path.exists("response_boosted.wav"):
@@ -260,20 +286,22 @@ def main():
     os.makedirs(CHROMA_DIR, exist_ok=True)
     collection, embedder = build_vector_store(DATASET_PATH, CHROMA_DIR)
 
-    print("\nPythia is listening. Say 'farewell' to exit.\n")
+    print("\nPythia is listening.\n")
     while True:
         record_audio(AUDIO_FILE)
         prompt = transcribe_whisper(AUDIO_FILE)
         if not prompt:
             continue
 
-        if normalize_prompt(prompt) == "farewell":
-            speak("Farewell, seeker.")
+        normalized = normalize_prompt(prompt)
+
+        if normalized == REVEAL_TRIGGER:
+            print("Veil broken — reading identity data.")
+            speak(REVEAL_TEXT)
             cleanup()
             break
 
         chunks = retrieve_context(prompt, collection, embedder)
-        print("RAG:", [c[:80] for c in chunks])
         response = query_ollama(prompt, chunks)
         speak(response)
 
