@@ -59,8 +59,6 @@ pythiaEmbodied/
 
 ├── scripts/        # Main Python script
 
-├── sounds/         # Field recordings for sonic triggers
-
 ├── docs/           # Dataset (not tracked by git)
 
 ├── oracle.modelfile
